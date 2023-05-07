@@ -79,10 +79,13 @@ class _HomePageState extends State<HomePage> {
                           ),
                           IconButton(
                             onPressed: () {
+                              final now = DateTime.now();
                               Navigator.pushNamed(context, '/send', arguments: {
                                 'id': item['id'],
                                 'title': item['title'],
                                 'description': item['description'],
+                                'date': now.toIso8601String(),
+                                'isEditing': true,
                               });
                             },
                             icon: const Icon(Icons.edit),

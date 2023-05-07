@@ -1,41 +1,52 @@
-import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:flutter/material.dart';
 
 class SendPage extends StatefulWidget {
-  final DatabaseReference itemsRef;
-  final String? id;
-  final String? title;
-  final String? description;
-
-  const SendPage({
-    Key? key,
-    required this.itemsRef,
-    this.id,
-    this.title,
-    this.description,
-  }) : super(key: key);
+  const SendPage({Key? key, required DatabaseReference itemsRef})
+      : super(key: key);
 
   @override
   _SendPageState createState() => _SendPageState();
 }
 
 class _SendPageState extends State<SendPage> {
-  late TextEditingController _titleController;
-  late TextEditingController _descriptionController;
+  late final TextEditingController _titleController;
+  late final TextEditingController _descriptionController;
+
+  // Add an item ID variable to store the ID of the item being edited (if any)
+  String? _itemId;
 
   @override
   void initState() {
+    _titleController = TextEditingController();
+    _descriptionController = TextEditingController();
     super.initState();
-    _titleController = TextEditingController(text: widget.title ?? '');
-    _descriptionController =
-        TextEditingController(text: widget.description ?? '');
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _descriptionController.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final arguments =
+        ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>?;
+
+    if (arguments != null && arguments['isEditing'] == true) {
+      // Editing an existing item
+      _itemId = arguments['id']; // Store the ID of the item being edited
+      _titleController.text = arguments['title'];
+      _descriptionController.text = arguments['description'];
+    }
+
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.id == null ? 'Add Item' : 'Update Item'),
+        title: Text(arguments != null && arguments['isEditing'] == true
+            ? 'Edit Item'
+            : 'Create Item'),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -44,67 +55,52 @@ class _SendPageState extends State<SendPage> {
           children: [
             TextField(
               controller: _titleController,
-              decoration: InputDecoration(
-                labelText: 'Title',
-                border: OutlineInputBorder(),
-              ),
+              decoration: const InputDecoration(hintText: 'Title'),
             ),
-            const SizedBox(height: 16.0),
+            const SizedBox(height: 16),
             TextField(
               controller: _descriptionController,
-              maxLines: 5,
-              decoration: InputDecoration(
-                labelText: 'Description',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 16.0),
-            ElevatedButton(
-              onPressed: () {
-                final title = _titleController.text.trim();
-                final description = _descriptionController.text.trim();
-                if (title.isEmpty || description.isEmpty) {
-                  showDialog(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                      title: const Text('Error'),
-                      content: const Text('Please enter all fields'),
-                      actions: [
-                        TextButton(
-                          onPressed: () {
-                            Navigator.of(context).pop();
-                          },
-                          child: const Text('OK'),
-                        ),
-                      ],
-                    ),
-                  );
-                } else {
-                  if (widget.id == null) {
-                    final newItemRef = widget.itemsRef.push();
-                    newItemRef.set({
-                      'id': newItemRef.key,
-                      'title': title,
-                      'description': description,
-                    }).then((_) {
-                      Navigator.of(context).pop();
-                    });
-                  } else {
-                    widget.itemsRef.child(widget.id!).update({
-                      'title': title,
-                      'description': description,
-                    }).then((_) {
-                      Navigator.of(context).pop();
-                    }).catchError((error) {
-                      print("Failed to update item: $error");
-                    });
-                  }
-                }
-              },
-              child: Text(widget.id == null ? 'Add Item' : 'Update Item'),
+              decoration: const InputDecoration(hintText: 'Description'),
+              maxLines: 3,
             ),
           ],
         ),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          final databaseRef = FirebaseDatabase.instance.reference();
+          final id = _itemId ?? databaseRef.child('items').push().key!;
+// Use the current date/time as the timestamp for the item
+          final date = DateTime.now().toIso8601String();
+          final title = _titleController.text;
+          final description = _descriptionController.text;
+          final isEditing = arguments != null ? arguments['isEditing'] : false;
+
+// Create a map of the item's data
+          final Map<String, dynamic> itemData = {
+            'id': id,
+            'title': title,
+            'description': description,
+            'date': date,
+          };
+
+// Add or update the item in Firebase
+          if (isEditing == true) {
+            databaseRef.child('items/$id').update(itemData);
+          } else {
+            databaseRef.child('items/$id').set(itemData);
+          }
+
+// Pass the edited/created item back to the previous screen
+          Navigator.pop(context, {
+            'id': id,
+            'title': title,
+            'description': description,
+            'date': date,
+            'isEditing': isEditing,
+          });
+        },
+        child: const Icon(Icons.save),
       ),
     );
   }

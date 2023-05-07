@@ -22,7 +22,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Flutter Firebase',
       theme: ThemeData(
-        primarySwatch: Colors.teal,
+        primarySwatch: Colors.blueGrey,
       ),
       initialRoute: '/home',
       routes: {
